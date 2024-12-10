@@ -1,101 +1,204 @@
-import Image from "next/image";
+"use client";
+
+import { Box, Container, Snackbar, SnackbarContent } from "@mui/material";
+import { useState, useRef } from "react";
+import { createClient, LiveTranscriptionEvents } from "@deepgram/sdk";
+import VoiceControls from "./Components/VoiceControls";
+import TranscriptBox from "./Components/TranscriptBox";
+import initiateMediaRecorder from "./utils/initiateMediaRecorder";
+import { DeepgramSocketRefType } from "@/types";
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+  const [transcript, setTranscript] = useState("Text will appear here...");
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isStopped, setIsStopped] = useState(true);
+  const [isSnackbarOpen, setIsSnackbarOpen] = useState(false);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const deepgramSocketRef = useRef<DeepgramSocketRefType>(null);
+
+  const initializeDeepgram = () => {
+    const deepgram = createClient(process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY);
+
+    // Create a WebSocket connection to Deepgram
+    const deepgramSocket = deepgram.listen.live({
+      language: "en",
+      smart_format: true,
+      model: "nova",
+    });
+
+    deepgramSocket.on(LiveTranscriptionEvents.Open, () => {
+      console.log("Deepgram WebSocket connection opened");
+
+      if (
+        mediaRecorderRef.current &&
+        mediaRecorderRef.current.state !== "recording"
+      ) {
+        mediaRecorderRef.current.start(250); // Send data every 250ms
+      }
+
+      if (isStopped) {
+        setIsStopped(false);
+        setTranscript("");
+      }
+
+      setIsRecording(true);
+      setIsSnackbarOpen(true);
+
+      // Handle incoming transcription results
+      deepgramSocket.on(LiveTranscriptionEvents.Transcript, (message) => {
+        const transcription =
+          message?.channel?.alternatives[0]?.transcript || "";
+
+        if (transcription) {
+          setTranscript((prev) => prev + " " + transcription);
+        }
+      });
+
+      deepgramSocket.on(LiveTranscriptionEvents.Error, (error) => {
+        console.error("Deepgram error:", error);
+        setTranscript(
+          (prev) => prev + "\nError: Transcription service error occurred."
+        );
+      });
+
+      deepgramSocket.on(LiveTranscriptionEvents.Close, () => {
+        console.log("Deepgram connection closed");
+        setIsPaused(false);
+      });
+    });
+
+    return deepgramSocket;
+  };
+
+  const handleStart = async () => {
+    try {
+      if (isPaused && mediaStreamRef.current && mediaRecorderRef.current) {
+        mediaRecorderRef.current.resume();
+
+        mediaStreamRef.current.getTracks().forEach((track) => {
+          track.enabled = true;
+        });
+
+        setIsPaused(false);
+        setIsRecording(true);
+        setIsSnackbarOpen(true);
+      }
+
+      if (!mediaRecorderRef.current) {
+        await initiateMediaRecorder({
+          mediaStreamRef,
+          mediaRecorderRef,
+          deepgramSocketRef,
+        });
+      }
+
+      deepgramSocketRef.current = isPaused
+        ? deepgramSocketRef.current
+        : initializeDeepgram();
+    } catch (error) {
+      console.error("Error starting recording:", error);
+      setTranscript(
+        "Error: Could not start recording. Please check permissions."
+      );
+    }
+  };
+
+  const handlePause = () => {
+    // Pause MediaRecorder
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.pause();
+    }
+
+    // Disable audio tracks
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => {
+        track.enabled = false;
+      });
+    }
+
+    setIsPaused(true);
+    setIsRecording(false);
+  };
+
+  const handleStop = () => {
+    if (isStopped) {
+      return;
+    }
+
+    // Stop MediaRecorder
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current = null;
+    }
+
+    // Stop media stream
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => {
+        track.stop();
+      });
+      mediaStreamRef.current = null;
+    }
+
+    // Close Deepgram connection
+    if (deepgramSocketRef.current) {
+      const closeStreamMsg = JSON.stringify({ type: "CloseStream" });
+      deepgramSocketRef.current.send(closeStreamMsg);
+      deepgramSocketRef.current = null;
+    }
+
+    setIsRecording(false);
+    setIsStopped(true);
+    setIsSnackbarOpen(true);
+  };
+
+  const handleSnackbarClose = () => {
+    setIsSnackbarOpen(false);
+  };
+
+  return (
+    <Container maxWidth="lg" sx={{ mt: 4 }}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: { xs: "column", md: "row" },
+          gap: 3,
+        }}
+      >
+        <Snackbar
+          anchorOrigin={{ vertical: "top", horizontal: "right" }}
+          open={isSnackbarOpen}
+          onClose={handleSnackbarClose}
+          message="Recording Started"
+          key={"Recording Started"}
+          autoHideDuration={5000}
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+          <SnackbarContent
+            message={
+              isRecording
+                ? "Recording Started"
+                : isPaused
+                ? "Recording Paused"
+                : isStopped
+                ? "Recording Stopped"
+                : null
+            }
+            sx={{
+              bgcolor: "primary.main",
+              color: "white",
+            }}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+        </Snackbar>
+        <VoiceControls
+          onStart={handleStart}
+          onPause={handlePause}
+          onStop={handleStop}
+          isRecording={isRecording}
+        />
+        <TranscriptBox transcript={transcript} />
+      </Box>
+    </Container>
   );
 }
