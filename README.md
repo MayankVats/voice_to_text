@@ -2,6 +2,10 @@
 
 ## Getting Started
 
+Get the API key from [Deepgram](https://deepgram.com/)
+
+Add the API key to the .env file
+
 Run the development server:
 
 ```bash
