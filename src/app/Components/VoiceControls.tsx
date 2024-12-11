@@ -38,8 +38,8 @@ const VoiceControls = ({
             color: "white",
           },
           "&.Mui-disabled": {
-            backgroundColor: "primary.main",
-            color: "white",
+            borderColor: "grey.500",
+            color: "grey.500",
           },
         }}
       >
@@ -60,8 +60,8 @@ const VoiceControls = ({
             color: "white",
           },
           "&.Mui-disabled": {
-            borderColor: "white",
-            color: "white",
+            borderColor: "grey.500",
+            color: "grey.500",
           },
         }}
       >
@@ -82,8 +82,8 @@ const VoiceControls = ({
             color: "white",
           },
           "&.Mui-disabled": {
-            borderColor: "white",
-            color: "white",
+            borderColor: "grey.500",
+            color: "grey.500",
           },
         }}
       >

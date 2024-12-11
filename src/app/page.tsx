@@ -9,7 +9,9 @@ import initiateMediaRecorder from "./utils/initiateMediaRecorder";
 import { DeepgramSocketRefType } from "@/types";
 
 export default function Home() {
-  const [transcript, setTranscript] = useState("Text will appear here...");
+  const [transcript, setTranscript] = useState(
+    "Click on mic to start transcribing."
+  );
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isStopped, setIsStopped] = useState(true);
@@ -160,6 +162,9 @@ export default function Home() {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4 }}>
+      <h1 className="text-4xl font-bold mb-6 flex justify-center">
+        Voice to text
+      </h1>
       <Box
         sx={{
           display: "flex",
