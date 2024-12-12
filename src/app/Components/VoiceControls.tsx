@@ -1,4 +1,4 @@
-import { Mic, Pause, Stop } from "@mui/icons-material";
+import { Mic, Pause, PlayArrow, Stop } from "@mui/icons-material";
 import { Box, IconButton } from "@mui/material";
 
 interface VoiceControlsProps {
@@ -6,6 +6,7 @@ interface VoiceControlsProps {
   onPause: () => void;
   onStop: () => void;
   isRecording: boolean;
+  onPlayback: () => void;
 }
 
 const VoiceControls = ({
@@ -13,6 +14,7 @@ const VoiceControls = ({
   onPause,
   onStop,
   isRecording,
+  onPlayback,
 }: VoiceControlsProps) => {
   return (
     <Box
@@ -88,6 +90,28 @@ const VoiceControls = ({
         }}
       >
         <Stop sx={{ fontSize: 32 }} />
+      </IconButton>
+
+      <IconButton
+        onClick={onPlayback}
+        color="success"
+        disabled={isRecording}
+        sx={{
+          width: 64,
+          height: 64,
+          border: "2px solid",
+          borderColor: isRecording ? "grey.400" : "success.main",
+          "&:hover": {
+            backgroundColor: "success.main",
+            color: "white",
+          },
+          "&.Mui-disabled": {
+            borderColor: "grey.500",
+            color: "grey.500",
+          },
+        }}
+      >
+        <PlayArrow sx={{ fontSize: 32 }} />
       </IconButton>
     </Box>
   );

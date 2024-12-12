@@ -21,6 +21,9 @@ export default function Home() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const deepgramSocketRef = useRef<DeepgramSocketRefType>(null);
 
+  const audioChunksRef = useRef<Blob[]>([]);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+
   const initializeDeepgram = () => {
     const deepgram = createClient(process.env.NEXT_PUBLIC_DEEPGRAM_API_KEY);
 
@@ -75,6 +78,18 @@ export default function Home() {
     return deepgramSocket;
   };
 
+  const handlePlayback = () => {
+    if (audioChunksRef.current.length > 0) {
+      const audioBlob = audioChunksRef.current[0];
+      const audioUrl = URL.createObjectURL(audioBlob);
+
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.src = audioUrl;
+        audioPlayerRef.current.play();
+      }
+    }
+  };
+
   const handleStart = async () => {
     try {
       if (isPaused && mediaStreamRef.current && mediaRecorderRef.current) {
@@ -94,6 +109,7 @@ export default function Home() {
           mediaStreamRef,
           mediaRecorderRef,
           deepgramSocketRef,
+          audioChunksRef,
         });
       }
 
@@ -201,7 +217,9 @@ export default function Home() {
           onPause={handlePause}
           onStop={handleStop}
           isRecording={isRecording}
+          onPlayback={handlePlayback}
         />
+        <audio ref={audioPlayerRef} style={{ display: "none" }} />
         <TranscriptBox transcript={transcript} />
       </Box>
     </Container>
